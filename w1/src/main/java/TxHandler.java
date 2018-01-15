@@ -94,6 +94,11 @@ public class TxHandler {
         int count = 0;
         for (Transaction transaction : possibleTxs) {
             if (isValidTx(transaction)) {
+                // Update UTXO pool
+                for (Transaction.Input input : transaction.getInputs()) {
+                    utxoPool.removeUTXO(new UTXO(input.prevTxHash, input.outputIndex));
+                }
+
                 result[count] = transaction;
                 count++;
             }
