@@ -1,6 +1,8 @@
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class TxHandler {
     private UTXOPool utxoPool;
@@ -89,22 +91,35 @@ public class TxHandler {
      * updating the current UTXO pool as appropriate.
      */
     public Transaction[] handleTxs(Transaction[] possibleTxs) {
-        Transaction[] result = new Transaction[possibleTxs.length];
+        Set<Transaction> unHandledTxs = new HashSet<Transaction>(Arrays.asList(possibleTxs));
+        Set<Transaction> validTxs = new HashSet<Transaction>();
 
-        int count = 0;
-        for (Transaction transaction : possibleTxs) {
-            if (isValidTx(transaction)) {
-                // Update UTXO pool
-                for (Transaction.Input input : transaction.getInputs()) {
-                    utxoPool.removeUTXO(new UTXO(input.prevTxHash, input.outputIndex));
+        while (true) {
+            boolean newValidTx = false;
+            for (Transaction transaction : unHandledTxs) {
+                if (isValidTx(transaction)) {
+                    // Remove spent UTXOs
+                    for (Transaction.Input input : transaction.getInputs()) {
+                        utxoPool.removeUTXO(new UTXO(input.prevTxHash, input.outputIndex));
+                    }
+
+                    // Add unspent UTXOs
+                    for (int i = 0; i < transaction.numOutputs(); i++) {
+                        Transaction.Output output = transaction.getOutput(i);
+                        UTXO utxo = new UTXO(transaction.getHash(), i);
+                        utxoPool.addUTXO(utxo, output);
+                    }
+
+                    validTxs.add(transaction);
+                    newValidTx = true;
                 }
-
-                result[count] = transaction;
-                count++;
             }
+
+            unHandledTxs.removeAll(validTxs);
+            if (newValidTx == false) break;
         }
 
-        return Arrays.copyOf(result, count);
+        return validTxs.toArray(new Transaction[0]);
     }
 
 }
